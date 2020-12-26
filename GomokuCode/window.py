@@ -138,7 +138,7 @@ class GomokuWindow(QMainWindow):
 
     @run_with_exc
     def mousePressEvent(self, e):
-        """根据鼠标的动作，确定落子位置"""
+        # 根据鼠标的动作，确定落子位置
         if not (hasattr(self, 'operate_status') and self.operate_status == 0):
             return
         if e.button() == Qt.LeftButton:

@@ -1,4 +1,3 @@
-import os
 import time
 
 from ai import AI1Step
@@ -7,9 +6,13 @@ from ai import AI1Step
 class Gomoku:
 
     def __init__(self):
+        self.player_first = True
         self.g_map = [[0 for y in range(15)] for x in range(15)]  # 当前的棋盘
         self.cur_step = 0  # 步数
         self.max_search_steps = 3  # 最远搜索2回合之后
+        if not self.player_first:
+            self.g_map[7][7] = 2
+            self.cur_step += 1
 
     def move_1step(self, input_by_window=False, pos_x=None, pos_y=None):
         """
@@ -105,17 +108,8 @@ class Gomoku:
         else:
             return 3
 
-    def ai_move_1step(self):
-        """电脑落子"""
-        for x in range(15):
-            for y in range(15):
-                if self.g_map[x][y] == 0:
-                    self.g_map[x][y] = 2
-                    self.cur_step += 1
-                    return
-
     def ai_play_1step_py_python(self):
-        ai = AI1Step(self, self.cur_step, True)  # AI判断下一步执行什么操作
+        ai = AI1Step(self, self.cur_step, self.player_first)  # AI判断下一步执行什么操作
         st = time.time()
         ai.search(0, [set(), set()], self.max_search_steps)  # 最远看2回合之后
         ed = time.time()
@@ -126,18 +120,18 @@ class Gomoku:
         if self.g_map[ai_ope[0]][ai_ope[1]] != 0:
             raise ValueError('self.game_map[ai_ope[0]][ai_ope[1]] = %d' % self.g_map[ai_ope[0]][ai_ope[1]])
         self.g_map[ai_ope[0]][ai_ope[1]] = 2
-        self.cur_step += 1
+
     """
     def ai_play_1step_py_python(self):          # 测试接口用
         for i in range(15):
             for j in range(15):
                 if self.g_map[i][j] == 1 and self.g_map[i][j+1] == 0:
                     self.g_map[i][j+1] = 2
-                    self.cur_step += 1
     """
     def ai_play_1step(self):
-        self.max_search_steps = 2
+        self.max_search_steps = 3
         self.ai_play_1step_py_python()
+        self.cur_step += 1
 
     def show(self, res):
         """显示游戏内容"""
@@ -163,20 +157,6 @@ class Gomoku:
             print('电脑获胜!')
         elif res == 3:
             print('平局!')
-
-    def play(self):
-        while True:
-            self.move_1step()  # 玩家下一步
-            res = self.game_result()  # 判断游戏结果
-            if res != 0:  # 如果游戏结果为“已经结束”，则显示游戏内容，并退出主循环
-                self.show(res)
-                return
-            self.ai_move_1step()  # 电脑下一步
-            res = self.game_result()
-            if res != 0:
-                self.show(res)
-                return
-            self.show(0)  # 在游戏还没有结束的情况下，显示游戏内容，并继续下一轮循环
 
     def map2string(self):
         mapstring = list()
