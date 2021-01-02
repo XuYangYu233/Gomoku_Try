@@ -1,10 +1,10 @@
-from PyQt5.QtWidgets import QApplication
+from PyQt5 import QtWidgets
 from window import GomokuWindow
 import sys
 
 
 def main():
-    app = QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     ex = GomokuWindow()
     sys.exit(app.exec_())
 

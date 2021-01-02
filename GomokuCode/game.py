@@ -3,6 +3,8 @@ import time
 from ai import AI1Step
 from yichuan import Yichuan
 
+from AI5 import GT_Tree
+
 
 class Gomoku:
 
@@ -14,6 +16,7 @@ class Gomoku:
         if not self.player_first:
             self.g_map[7][7] = 2
             self.cur_step += 1
+        # 生成树
 
     def move_1step(self, input_by_window=False, pos_x=None, pos_y=None):
         """
@@ -123,6 +126,14 @@ class Gomoku:
             raise ValueError('self.game_map[ai_ope[0]][ai_ope[1]] = %d' % self.g_map[ai_ope[0]][ai_ope[1]])
         self.g_map[ai_ope[0]][ai_ope[1]] = 2
     """
+    """
+    def ai_play_1step_py_python(self):          # AI5
+      
+        Gtree = GT_Tree(self.g_map, 1)
+        ai_pos = Gtree.search_best(self.g_map)
+        self.g_map[ai_pos[0]][ai_pos[1]] = 2
+    """
+
     """
     def ai_play_1step_py_python(self):          # 测试接口用
         for i in range(15):
