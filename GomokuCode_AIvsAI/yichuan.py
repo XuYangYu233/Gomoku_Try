@@ -13,13 +13,10 @@ class Yichuan:
         self.sel_fixer = 0.3
         self.prab_cro = 0.7
         self.prab_mut = 0.3
-        self.mul_fixer = 0.1
+        self.mul_fixer = 0.05
         self.max_son = 2
-        self.fit_reduction = 0.90
+        self.fit_reduction = 0.5
         self.aval_distance = 2
-        self.max_value = 0
-        for i in range(self.chorme_len):
-            self.max_value += 100 * self.fit_reduction ** i
         self.wall = 9
         self.color = color
 
@@ -51,14 +48,17 @@ class Yichuan:
         for i in range(self.init_group):
             chorme = []
             map_copy = copy.deepcopy(self.map)
+            available_points = self.find_available_points(map_copy)
             for j in range(self.chorme_len):
-                available_points = self.find_available_points(map_copy)
                 temp = self.random_point(available_points)
                 chorme.append(temp)
+                available_points.remove(temp)
+                """
                 if self.color == 2:
                     map_copy[temp[0]][temp[1]] = 2 - j % 2
                 else:
                     map_copy[temp[0]][temp[1]] = 1 + j % 2
+                """
             pop.append(chorme)
             for x in chorme:
                 if chorme.count(x) > 1:
@@ -68,32 +68,24 @@ class Yichuan:
 
     def cal_fit(self, chorme):
         count = 0
+        posi = 0
         map_copy = copy.deepcopy(self.map)
-        flag_win = False
-        winner = 0
-        duizhao = 0
         for i in chorme:
-            duizhao += 100 * self.fit_reduction ** chorme.index(i)
-            if flag_win:
-                count += (1 - winner) * 100 * self.fit_reduction ** chorme.index(i)
-            else:
-                color = (2 - chorme.index(i) % 2) if self.color == 2 else (1 + chorme.index(i) % 2)
-                tmp_val = self.point_value(i, map_copy, color)
-                map_copy[i[0]][i[1]] = color
-                count += tmp_val * self.fit_reduction ** chorme.index(i)
-                if tmp_val == 100:
-                    flag_win = True
-                    winner = chorme.index(i) % 2
-            if count > duizhao:
-                raise ValueError("illegal count")
+            color = (2 - chorme.index(i) % 2) if self.color == 2 else (1 + chorme.index(i) % 2)
+            tmp_val = self.point_value(i, map_copy, color)
+            map_copy[i[0]][i[1]] = color
+            temp = tmp_val * self.fit_reduction ** chorme.index(i)
+            if count < temp:
+                count = max(count, temp)
+                posi = chorme.index(i)
 
-        return count
+        return count, posi
 
-    def selection(self, pop, fits):  # 仿轮盘赌
+    def selection(self, pop, fits, best_val):  # 仿轮盘赌
         new_pop = copy.deepcopy(pop)
         new_fits = copy.deepcopy(fits)
         for i in range(len(fits)):
-            prab_a = fits[i] / self.max_value
+            prab_a = fits[i] / best_val
             prab_a **= self.sel_fixer
             if random.random() > prab_a:
                 new_fits.remove(fits[i])
@@ -166,7 +158,7 @@ class Yichuan:
                     else:
                         print("detecting overlap! retrying")
 
-    def mutation(self, pop):
+    def mutation(self, pop, fits):
         for i in range(len(pop)):
             if random.random() < self.prab_mut:
                 chrome_a = pop[i]
@@ -178,15 +170,16 @@ class Yichuan:
                     chrome_a[position_b],
                     chrome_a[position_a],
                 )
+                fits[i], posi = self.cal_fit(chrome_a)
 
-    def multiply(self, pop, fits):
+    def multiply(self, pop, fits, best_val):
         new_pop = copy.deepcopy(pop)
         new_fits = copy.deepcopy(fits)
         new_fits, new_pop = (list(t) for t in zip(*sorted(zip(new_fits, new_pop))))
         new_fits.reverse()
         new_pop.reverse()
         for i in range(len(fits)):
-            prab_a = fits[i] / self.max_value
+            prab_a = fits[i] / best_val
             prab_a **= self.mul_fixer
             if random.random() <= prab_a:
                 sons = random.randint(1, self.max_son)
@@ -202,10 +195,12 @@ class Yichuan:
         pop = self.gene_encode()
         print("gene_encode finished")
         best_chorme, best_val = (0, 0), 0
+        count, posi = 0, 0
         for i in range(self.generations):
             fits = []
             for j in range(len(pop)):
-                fits.append(self.cal_fit(pop[j]))
+                count, posi = self.cal_fit(pop[j])
+                fits.append(count)
             if max(fits) > best_val:
                 best_val = max(fits)
                 best_chorme = pop[fits.index(max(fits))]
@@ -214,15 +209,18 @@ class Yichuan:
             pop.append(best_chorme)
             fits.append(best_val)  # 保留最佳选择
             self.crossover(pop)
-            self.mutation(pop)
-            pop = self.multiply(pop, fits)
+            self.mutation(pop, fits)
+            pop = self.multiply(pop, fits, best_val)
+            if i % 10 == 0:
+                print("代数:", end=' ')
+            print(i + 1, end="->")
             if i % 10 == 9:
                 print(
-                    "第{}代: 最佳点位({}, {}), 权值:{}".format(
+                    "\n第{}代: 最佳点位({}, {}), 权值:{}".format(
                         i + 1,
                         best_chorme[0][0],
                         best_chorme[0][1],
-                        best_val / self.max_value,
+                        best_val,
                     )
                 )
                 print("预测走向:", end=" ")
@@ -230,7 +228,11 @@ class Yichuan:
                     print(i, end=", ")
                 print("\n种群规模为{}".format(len(pop)))
 
-        return best_chorme[0]
+        count, posi = self.cal_fit(best_chorme)
+        if posi % 2 == 1:
+            return best_chorme[1]
+        else:
+            return best_chorme[0]
 
     def cal_line(self, lines, color):
         if lines[0][4] != 0 or lines[1][4] != 0 or lines[2][4] != 0 or lines[3][4] != 0:
@@ -259,40 +261,53 @@ class Yichuan:
         ]  # 敌方
         # 活三
         own_live_three = [
-            re.compile(r"00{}{{3}}0".format(self.own_symbol)),
-            re.compile(r"0{}{{3}}00".format(self.own_symbol)),
-            re.compile(r"0{}{{2}}0{}0".format(self.own_symbol, self.own_symbol)),
+            re.compile(r'00{}{{3}}0'.format(self.own_symbol)), 
+            re.compile(r'0{}{{3}}00'.format(self.own_symbol)),
+            re.compile(r'0{}{{2}}0{}0'.format(self.own_symbol, self.own_symbol)),
+            re.compile(r'0{}{{2}}0{}0'.format(self.own_symbol, self.own_symbol)), 
+            re.compile(r'0{}0{}{{2}}0'.format(self.own_symbol, self.own_symbol)) 
         ]
         enemy_live_three = [
-            re.compile(r"0{}{{3}}00".format(self.enemy_symbol)),
-            re.compile(r"00{}{{3}}0".format(self.enemy_symbol)),
-            re.compile(r"0{}{{2}}0{}0".format(self.enemy_symbol, self.enemy_symbol)),
+            re.compile(r'0{}{{3}}00'.format(self.enemy_symbol)),
+            re.compile(r'00{}{{3}}0'.format(self.enemy_symbol)),
+            re.compile(r'0{}{{2}}0{}0'.format(self.enemy_symbol, self.enemy_symbol)),
+            re.compile(r'0{}{{2}}0{}0'.format(self.enemy_symbol, self.enemy_symbol)), 
+            re.compile(r'0{}0{}{{2}}0'.format(self.enemy_symbol, self.enemy_symbol)) 
         ]
         # 眠三
         own_cr_three = [
-            re.compile(r"(?:{}|{}){}{{3}}00".format(self.wall, self.enemy_symbol, self.own_symbol)),
-            re.compile(r"00{}{{3}}(?:{}|{})".format(self.own_symbol, self.enemy_symbol, self.wall)),
-            re.compile(r"{}{{2}}0{}".format(self.own_symbol, self.own_symbol)),
-            re.compile(r"{}0{}{{2}}".format(self.own_symbol, self.own_symbol)),
-        ]   
+            re.compile(r'(?:{}|{}){}{{3}}00'.format(self.wall, self.enemy_symbol, self.own_symbol)), 
+            re.compile(r'00{}{{3}}(?:{}|{})'.format(self.own_symbol, self.enemy_symbol, self.wall)), 
+            re.compile(r'(?:{}|{}){}{{2}}0{}0'.format(self.enemy_symbol, self.wall, self.own_symbol, self.own_symbol)),
+            re.compile(r'0{}{{2}}0{}(?:{}|{})'.format(self.own_symbol, self.own_symbol, self.enemy_symbol, self.wall)), 
+            re.compile(r'(?:{}|{}){}0{}{{2}}0'.format(self.enemy_symbol, self.wall, self.own_symbol, self.own_symbol)),
+            re.compile(r'0{}0{}{{2}}(?:{}|{})'.format(self.own_symbol, self.own_symbol, self.enemy_symbol, self.wall)) 
+        ]
+
         enemy_cr_three = [
-            re.compile(r"(?:{}|{}){}{{3}}00".format(self.wall, self.own_symbol, self.enemy_symbol)),
-            re.compile(r"00{}{{3}}(?:{}|{})".format(self.enemy_symbol, self.own_symbol, self.wall)),
-            re.compile(r"{}{{2}}0{}".format(self.enemy_symbol, self.enemy_symbol)),
-            re.compile(r"{}0{}{{2}}".format(self.enemy_symbol, self.enemy_symbol)),
+            re.compile(r'(?:{}|{}){}{{3}}00'.format(self.wall, self.own_symbol, self.enemy_symbol)), 
+            re.compile(r'00{}{{3}}(?:{}|{})'.format(self.enemy_symbol, self.own_symbol, self.wall)),
+            re.compile(r'(?:{}|{}){}{{2}}0{}0'.format(self.own_symbol, self.wall, self.enemy_symbol, self.enemy_symbol)),
+            re.compile(r'0{}{{2}}0{}(?:{}|{})'.format(self.enemy_symbol, self.enemy_symbol, self.own_symbol, self.wall)), 
+            re.compile(r'(?:{}|{}){}0{}{{2}}0'.format(self.own_symbol, self.wall, self.enemy_symbol, self.enemy_symbol)),
+            re.compile(r'0{}0{}{{2}}(?:{}|{})'.format(self.enemy_symbol, self.enemy_symbol, self.own_symbol, self.wall))  
         ]
 
         # 活二
-        own_live_two = re.compile(r"00{}{{2}}00".format(self.own_symbol))
-        enemy_live_two = re.compile(r"00{}{{2}}00".format(self.enemy_symbol))
+        own_live_two = re.compile(r'00{}{{2}}00'.format(self.own_symbol))
+        enemy_live_two = re.compile(r'00{}{{2}}00'.format(self.enemy_symbol))
         # 半活二
         own_halive_two = [
-            re.compile(r"0{}{{2}}00".format(self.own_symbol)),
-            re.compile(r"00{}{{2}}0".format(self.own_symbol)),
+            re.compile(r'(?:{}|{})0{}{{2}}00'.format(self.enemy_symbol, self.wall, self.own_symbol)),
+            re.compile(r'0{}{{2}}00(?:{}|{})'.format(self.own_symbol, self.wall, self.enemy_symbol)),
+            re.compile(r'00{}{{2}}0(?:{}|{})'.format(self.own_symbol, self.enemy_symbol, self.wall)),
+            re.compile(r'(?:{}|{})00{}{{2}}0'.format(self.enemy_symbol, self.wall, self.own_symbol))
         ]
         enemy_halive_two = [
-            re.compile(r"0{}{{2}}00".format(self.enemy_symbol)),
-            re.compile(r"00{}{{2}}0".format(self.enemy_symbol)),
+            re.compile(r'(?:{}|{})0{}{{2}}00'.format(self.own_symbol, self.wall, self.enemy_symbol)),
+            re.compile(r'0{}{{2}}00(?:{}|{})'.format(self.enemy_symbol, self.wall, self.own_symbol)),
+            re.compile(r'00{}{{2}}0(?:{}|{})'.format(self.enemy_symbol, self.own_symbol, self.wall)),
+            re.compile(r'(?:{}|{})00{}{{2}}0'.format(self.own_symbol, self.wall, self.enemy_symbol))
         ]
         # 半死不活二
         own_cr_two = [
@@ -324,92 +339,100 @@ class Yichuan:
 
         """
         own_prob = 1
-        enemy_prob = 1
+        enemy_prob = 5
         own_score = 0
         enemy_score = 0
 
-        wu = 100
-        huosi = 100
-        chongsi = 100
-        huosan = 49
-        miansan = 33
-        huoer = 20
-        banhuoer = 15
-        bansibuhuoer = 13
-        yi = 5
-        ling = 1
+        wu = 1000001
+        huosi = 50000
+        chongsi = 26000
+        huosan = 13010
+        miansan = 2600
+        huoer = 260
+        banhuoer = 50
+        bansibuhuoer = 20
+        yi = 0
+        ling = 0
 
         for line in lines:
             str_line = "".join([str(i) for i in line])  # 将列表转换成正则表达式可以处理的形式
             # 己方得分
             # 五
-            re1 = own_five.findall(str_line) != []
-            own_score += re1 * wu
+            re1 = own_five.findall(str_line)
+            own_score += len(re1) * wu
             # 活四
-            re2 = own_live_four.findall(str_line) != []
-            own_score += re2 * huosi
+            re2 = own_live_four.findall(str_line)
+            own_score += len(re2) * huosi
             # 冲四
             for compile_ in own_cr_four:
-                re3 = compile_.findall(str_line) != []
-                own_score += re3 * chongsi
+                re3 = compile_.findall(str_line)
+                own_score += len(re3) * chongsi
             # 活三
             for compile_ in own_live_three:
-                re4 = compile_.findall(str_line) != []
-                own_score += re4 * huosan
+                re4 = compile_.findall(str_line)
+                len4 = len(re4)
+                if len4 >= 2:
+                    own_score += own_live_four - 10000
+                else:
+                    own_score += len4 * huosan
             # 眠三
             for compile_ in own_cr_three:
-                re5 = compile_.findall(str_line) != []
-                own_score += re5 * miansan
+                re5 = compile_.findall(str_line)
+                own_score += len(re5) * miansan
             # 活二
-            re6 = own_live_two.findall(str_line) != []
-            own_score += re6 * huoer
+            re6 = own_live_two.findall(str_line)
+            own_score += len(re6) * huoer
             # 半活二
             for compile_ in own_halive_two:
-                re7 = compile_.findall(str_line) != []
-                own_score += re7 * banhuoer
+                re7 = compile_.findall(str_line)
+                own_score += len(re7) * banhuoer
             # 半死不活二
             for compile_ in own_cr_two:
-                re8 = compile_.findall(str_line) != []
-                own_score += re8 * bansibuhuoer
+                re8 = compile_.findall(str_line)
+                own_score += len(re8) * bansibuhuoer
             # 一
-            re9 = own_live_one.findall(str_line) != []
-            own_score += re9 * yi
-            re10 = own_cr_one.findall(str_line) != []
-            own_score += re10 * ling
+            re9 = own_live_one.findall(str_line)
+            own_score += len(re9) * yi
+            re10 = own_cr_one.findall(str_line)
+            own_score += len(re10) * ling
             # 敌方得分
             # 五
-            re1 = enemy_five.findall(str_line) != []
-            enemy_score += re1 * wu
+            re1 = enemy_five.findall(str_line)
+            enemy_score += len(re1) * wu
             # 活四
-            re2 = enemy_live_four.findall(str_line) != []
-            enemy_score += re2 * huosi
+            re2 = enemy_live_four.findall(str_line)
+            enemy_score += len(re2) * huosi
             # 冲四
             for compile_ in enemy_cr_four:
-                re3 = compile_.findall(str_line) != []
-                enemy_score += re3 * chongsi
+                re3 = compile_.findall(str_line)
+                enemy_score += len(re3) * chongsi
             # 活三
             for compile_ in enemy_live_three:
-                re4 = compile_.findall(str_line) != []
-                enemy_score += re4 * huosan
+                re4 = compile_.findall(str_line)
+                len4 = len(re4)
+                if len4 >= 2:
+                    enemy_score += own_live_four - 10000
+                else:
+                    enemy_score += len4 * huosan
             # 眠三
             for compile_ in enemy_cr_three:
-                re5 = compile_.findall(str_line) != []
-                enemy_score += re5 * miansan
+                re5 = compile_.findall(str_line)
+                enemy_score += len(re5) * miansan
             # 活二
-            re6 = enemy_live_two.findall(str_line) != []
-            enemy_score += re6 * huoer
+            re6 = enemy_live_two.findall(str_line)
+            enemy_score += len(re6) * huoer
             # 半活二
             for compile_ in enemy_halive_two:
-                re7 = compile_.findall(str_line) != []
-                enemy_score += re7 * banhuoer
+                re7 = compile_.findall(str_line)
+                enemy_score += len(re7) * banhuoer
             # 半死不活二
             for compile_ in enemy_cr_two:
-                re8 = compile_.findall(str_line) != []
-                enemy_score += re8 * bansibuhuoer
-            re9 = enemy_live_one.findall(str_line) != []
-            enemy_score += re9 * yi
-            re10 = enemy_cr_one.findall(str_line) != []
-            enemy_score += re10 * ling
+                re8 = compile_.findall(str_line)
+                enemy_score += len(re8) * bansibuhuoer
+            re9 = enemy_live_one.findall(str_line)
+            enemy_score += len(re9) * yi
+            re10 = enemy_cr_one.findall(str_line)
+            enemy_score += len(re10) * ling
         return own_score * own_prob + enemy_score * enemy_prob
 
     def point_value(self, point, map_copy, color):
@@ -447,8 +470,6 @@ class Yichuan:
                 line[3].append(map_copy[x - i][y + i])
 
         values = self.cal_line(line, color)
-        if values > 100:
-            values = 100
         return values
 
 
@@ -456,6 +477,6 @@ if __name__ == "__main__":
     print("testing module")
     map = [[0 for y in range(15)] for x in range(15)]
     map[7][7] = 1
-    a = Yichuan(map)
+    a = Yichuan(map, 2)
     x, y = a.play()
     print("x: {}, y: {}".format(x, y))

@@ -126,20 +126,13 @@ class Gomoku:
             raise ValueError('self.game_map[ai_ope[0]][ai_ope[1]] = %d' % self.g_map[ai_ope[0]][ai_ope[1]])
         self.g_map[ai_ope[0]][ai_ope[1]] = 2
     """
-    """
+
     def ai_play_1step_py_python(self):          # AI5
       
         Gtree = GT_Tree(self.g_map, 1)
         ai_pos = Gtree.search_best(self.g_map)
         self.g_map[ai_pos[0]][ai_pos[1]] = 2
-    """
 
-    """
-    def ai_play_1step_py_python(self):          # 测试接口用
-        for i in range(15):
-            for j in range(15):
-                if self.g_map[i][j] == 1 and self.g_map[i][j+1] == 0:
-                    self.g_map[i][j+1] = 2
     """
     def ai_play_1step_py_python(self):
         u_yichuan = Yichuan(self.g_map, 2)
@@ -148,6 +141,7 @@ class Gomoku:
         ed = time.time()
         print("用时{}s\n".format(ed - st))
         self.g_map[next[0]][next[1]] = 2
+    """
 
     def ai_play_1step(self):
         self.max_search_steps = 2
