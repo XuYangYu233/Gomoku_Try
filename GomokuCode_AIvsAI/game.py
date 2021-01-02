@@ -109,38 +109,56 @@ class Gomoku:
         else:
             return 3
 
-    """
     def ai_play_1step_py_python(self):
         ai = AI1Step(self, self.cur_step, self.player_first)  # AI判断下一步执行什么操作
         st = time.time()
         ai.search(0, [set(), set()], self.max_search_steps)  # 最远看2回合之后
         ed = time.time()
         print('生成了%d个节点，用时%.4f，评价用时%.4f' % (len(ai.method_tree), ed - st, ai.t))
+        print("点位为:({}, {})".format(ai_ope[0], ai_ope[1]))
         if ai.next_node_dx_list[0] == -1:
             raise ValueError('ai.next_node_dx_list[0] == -1')
         ai_ope = ai.method_tree[ai.next_node_dx_list[0]].ope
         if self.g_map[ai_ope[0]][ai_ope[1]] != 0:
             raise ValueError('self.game_map[ai_ope[0]][ai_ope[1]] = %d' % self.g_map[ai_ope[0]][ai_ope[1]])
         self.g_map[ai_ope[0]][ai_ope[1]] = 2
-    """
+
     """
     def ai_play_1step_py_python(self):          # 测试接口用
         for i in range(15):
             for j in range(15):
                 if self.g_map[i][j] == 1 and self.g_map[i][j+1] == 0:
                     self.g_map[i][j+1] = 2
-    """
+
     def ai_play_1step_py_python(self):
-        u_yichuan = Yichuan(self.g_map, 2)
+        u_yichuan = Yichuan(self.g_map)
         st = time.time()
         next = u_yichuan.play()
         ed = time.time()
         print("用时{}s\n".format(ed - st))
         self.g_map[next[0]][next[1]] = 2
+    """
 
     def ai_play_1step(self):
         self.max_search_steps = 2
         self.ai_play_1step_py_python()
+        self.cur_step += 1
+
+    def ai2_play_1step_py_python(self):
+        u_yichuan = Yichuan(self.g_map, 1)
+        st = time.time()
+        next = u_yichuan.play()
+        ed = time.time()
+        print("用时{}s\n".format(ed - st))
+        self.g_map[next[0]][next[1]] = 1
+
+    def ai2_play_1step(self):
+        self.max_search_steps = 2
+        self.ai2_play_1step_py_python()
+        self.cur_step += 1
+
+    def ai_first_play(self):
+        self.g_map[7][7] = 1
         self.cur_step += 1
 
     def show(self, res):
